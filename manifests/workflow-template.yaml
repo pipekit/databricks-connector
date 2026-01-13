@@ -1,0 +1,218 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: databricks-connector
+  annotations:
+    description: "Submit, monitor, and retrieve results from Databricks jobs using the pipekit/databricks-connector."
+spec:
+  entrypoint: run-job
+  templates:
+  - name: run-job
+    inputs:
+      parameters:
+      # Required
+      - name: code-path
+        description: "Path to the code (Notebook path or DBFS Python file path)"
+      # Task Type
+      - name: task-type
+        value: "notebook"
+        enum: ["notebook", "spark-python"]
+        description: "Type of task: notebook or spark-python"
+      # Cluster Config (Either existing or new)
+      - name: existing-cluster-id
+        value: ""
+        description: "ID of an existing cluster to reuse"
+      - name: new-cluster-node-type
+        value: ""
+        description: "Node type for new cluster (e.g., i3.xlarge). Required if existing-cluster-id is empty."
+      - name: new-cluster-spark-version
+        value: ""
+        description: "Spark version for new cluster. Required if existing-cluster-id is empty."
+      - name: new-cluster-num-workers
+        value: "1"
+        description: "Number of workers for new cluster"
+      # Job Config
+      - name: job-parameters
+        value: ""
+        description: "Comma-separated parameters (e.g., key1=value1,key2=value2)"
+      - name: email-notifications
+        value: ""
+        description: "Comma-separated list of emails for notifications"
+      # Auth
+      - name: databricks-secret-name
+        value: "databricks-secret"
+        description: "Name of the K8s Secret containing DATABRICKS_HOST and DATABRICKS_TOKEN"
+
+    outputs:
+      parameters:
+      - name: run-id
+        valueFrom:
+          parameter: "{{steps.submit.outputs.result}}"
+      - name: run-url
+        valueFrom:
+          parameter: "{{steps.get-output.outputs.parameters.run-url}}"
+      - name: result
+        valueFrom:
+          parameter: "{{steps.get-output.outputs.parameters.result}}"
+      - name: state
+        valueFrom:
+          parameter: "{{steps.get-output.outputs.parameters.state}}"
+
+    steps:
+    - - name: submit
+        template: submit
+        arguments:
+          parameters:
+          - name: code-path
+            value: "{{inputs.parameters.code-path}}"
+          - name: task-type
+            value: "{{inputs.parameters.task-type}}"
+          - name: existing-cluster-id
+            value: "{{inputs.parameters.existing-cluster-id}}"
+          - name: new-cluster-node-type
+            value: "{{inputs.parameters.new-cluster-node-type}}"
+          - name: new-cluster-spark-version
+            value: "{{inputs.parameters.new-cluster-spark-version}}"
+          - name: new-cluster-num-workers
+            value: "{{inputs.parameters.new-cluster-num-workers}}"
+          - name: job-parameters
+            value: "{{inputs.parameters.job-parameters}}"
+          - name: email-notifications
+            value: "{{inputs.parameters.email-notifications}}"
+          - name: databricks-secret-name
+            value: "{{inputs.parameters.databricks-secret-name}}"
+
+    - - name: monitor
+        template: monitor
+        arguments:
+          parameters:
+          - name: run-id
+            value: "{{steps.submit.outputs.result}}"
+          - name: databricks-secret-name
+            value: "{{inputs.parameters.databricks-secret-name}}"
+
+    - - name: get-output
+        template: get-output
+        arguments:
+          parameters:
+          - name: run-id
+            value: "{{steps.submit.outputs.result}}"
+          - name: databricks-secret-name
+            value: "{{inputs.parameters.databricks-secret-name}}"
+
+  # --- Sub-Templates ---
+
+  - name: submit
+    inputs:
+      parameters:
+      - name: code-path
+      - name: task-type
+      - name: existing-cluster-id
+      - name: new-cluster-node-type
+      - name: new-cluster-spark-version
+      - name: new-cluster-num-workers
+      - name: job-parameters
+      - name: email-notifications
+      - name: databricks-secret-name
+    container:
+      image: isubasinghe/databricks-connector:latest
+      command: ["/databricks-connector", "submit"]
+      args:
+      - "--code-path={{inputs.parameters.code-path}}"
+      - "--task-type={{inputs.parameters.task-type}}"
+      # Optional args logic is handled by the binary if flags are passed empty, 
+      # but it's cleaner to only pass them if set. 
+      # However, for simplicity in YAML, we often pass them and let the CLI handle empty strings if robust.
+      # Our CLI checks `if existingClusterID != ""` etc. so passing empty string is fine.
+      - "--existing-cluster-id={{inputs.parameters.existing-cluster-id}}"
+      - "--new-cluster-node-type={{inputs.parameters.new-cluster-node-type}}"
+      - "--new-cluster-spark-version={{inputs.parameters.new-cluster-spark-version}}"
+      - "--new-cluster-num-workers={{inputs.parameters.new-cluster-num-workers}}"
+      - "--parameters={{inputs.parameters.job-parameters}}"
+      # We need to handle email list. CLI expects slice. `StringSliceVar` usually splits by comma.
+      - "--email-notifications={{inputs.parameters.email-notifications}}"
+      env:
+      - name: DATABRICKS_HOST
+        valueFrom:
+          secretKeyRef:
+            name: "{{inputs.parameters.databricks-secret-name}}"
+            key: host
+      - name: DATABRICKS_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: "{{inputs.parameters.databricks-secret-name}}"
+            key: token
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 128Mi
+
+  - name: monitor
+    inputs:
+      parameters:
+      - name: run-id
+      - name: databricks-secret-name
+    container:
+      image: isubasinghe/databricks-connector:latest
+      command: ["/databricks-connector", "monitor"]
+      args:
+      - "--run-id={{inputs.parameters.run-id}}"
+      env:
+      - name: DATABRICKS_HOST
+        valueFrom:
+          secretKeyRef:
+            name: "{{inputs.parameters.databricks-secret-name}}"
+            key: host
+      - name: DATABRICKS_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: "{{inputs.parameters.databricks-secret-name}}"
+            key: token
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+
+  - name: get-output
+    inputs:
+      parameters:
+      - name: run-id
+      - name: databricks-secret-name
+    outputs:
+      parameters:
+      - name: run-url
+        valueFrom:
+          path: /tmp/url
+      - name: result
+        valueFrom:
+          path: /tmp/result
+          default: "No result found" # Handle cases where result file isn't written
+      - name: state
+        valueFrom:
+          path: /tmp/state
+    container:
+      image: isubasinghe/databricks-connector:latest
+      command: ["/databricks-connector", "get-output"]
+      args:
+      - "--run-id={{inputs.parameters.run-id}}"
+      - "--write-url=/tmp/url"
+      - "--write-result=/tmp/result"
+      - "--write-state=/tmp/state"
+      env:
+      - name: DATABRICKS_HOST
+        valueFrom:
+          secretKeyRef:
+            name: "{{inputs.parameters.databricks-secret-name}}"
+            key: host
+      - name: DATABRICKS_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: "{{inputs.parameters.databricks-secret-name}}"
+            key: token
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
