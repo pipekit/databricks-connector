@@ -2,8 +2,49 @@
 
 Submit a Databricks job run
 
+### Synopsis
+
+Submit a new run to Databricks.
+
+This command supports submitting:
+- Notebook tasks (on new or existing clusters)
+- Spark Python tasks
+- Spark JAR tasks
+
+It outputs the Run ID to stdout, which can be captured by Argo Workflows.
+
 ```
 databricks-connector submit [flags]
+```
+
+### Examples
+
+```
+  # Submit a Notebook task on a new cluster
+  databricks-connector submit \
+    --task-type notebook \
+    --code-path /Users/me/my-notebook \
+    --new-cluster-node-type i3.xlarge \
+    --new-cluster-spark-version 13.3.x-scala2.12 \
+    --new-cluster-num-workers 2 \
+    --parameters "param1=value1,param2=value2"
+
+  # Submit a Spark Python task on an existing cluster
+  databricks-connector submit \
+    --task-type spark-python \
+    --code-path dbfs:/FileStore/my-script.py \
+    --existing-cluster-id 1234-567890-abcde \
+    --parameters "arg1=val1"
+
+  # Submit a Spark JAR task
+  databricks-connector submit \
+    --task-type spark-jar \
+    --code-path dbfs:/FileStore/my-app.jar \
+    --main-class-name com.example.MyApp \
+    --new-cluster-node-type i3.xlarge \
+    --new-cluster-spark-version 13.3.x-scala2.12 \
+    --new-cluster-num-workers 2 \
+    --args "arg1" --args "arg2"
 ```
 
 ### Options

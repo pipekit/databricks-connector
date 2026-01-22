@@ -2,8 +2,21 @@
 
 Cancel a Databricks job run
 
+### Synopsis
+
+Request the cancellation of a running Databricks job.
+
+This sends a cancellation request to the Databricks API. It does not wait for the
+cancellation to complete.
+
 ```
 databricks-connector cancel [flags]
+```
+
+### Examples
+
+```
+  databricks-connector cancel --run-id 123456
 ```
 
 ### Options

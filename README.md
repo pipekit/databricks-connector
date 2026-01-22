@@ -10,6 +10,8 @@ go build -o databricks-connector cmd/databricks-connector/main.go
 
 ## Usage
 
+For a complete reference of all commands and flags, see the [CLI Reference](docs/databricks-connector.md).
+
 ### 1. Submit a Run
 
 Submits a new run. Prints the Run ID to stdout.

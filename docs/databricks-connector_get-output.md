@@ -2,8 +2,32 @@
 
 Get output of a Databricks job run
 
+### Synopsis
+
+Retrieve the outputs, state, and details of a completed Databricks job run.
+
+This command is designed to extract specific pieces of information (URL, State, Result)
+and write them to files. This is particularly useful for Argo Workflows "Output Parameters",
+where you can map the file content to a workflow variable.
+
+It can also dump the full JSON representation of the run and its output for debugging.
+
 ```
 databricks-connector get-output [flags]
+```
+
+### Examples
+
+```
+  # Write output details to specific files for Argo
+  databricks-connector get-output \
+    --run-id 123456 \
+    --write-url /tmp/run_url \
+    --write-result /tmp/result \
+    --write-state /tmp/state
+
+  # Dump full JSON to stdout
+  databricks-connector get-output --run-id 123456 --json
 ```
 
 ### Options

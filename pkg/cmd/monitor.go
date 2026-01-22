@@ -21,6 +21,18 @@ var (
 var monitorCmd = &cobra.Command{
 	Use:   "monitor",
 	Short: "Monitor a Databricks job run",
+	Long: `Monitor the status of a Databricks job run.
+
+This command polls the Databricks API for the run's status. It streams state changes
+to stdout. The command blocks until the run reaches a terminal state (Terminated, Skipped, InternalError).
+
+If the process receives a termination signal (SIGINT, SIGTERM) - for example, if the Argo Workflow step
+is stopped - it attempts to cancel the running Databricks job before exiting.`,
+	Example: `  # Monitor a specific run
+  databricks-connector monitor --run-id 123456
+
+  # Monitor with a custom polling interval
+  databricks-connector monitor --run-id 123456 --interval 30s`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create a context that listens for system signals (SIGINT, SIGTERM)
 		// This handles the "Stop" button in Argo Workflows.
