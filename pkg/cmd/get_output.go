@@ -17,6 +17,7 @@ var (
 	outputURLPath    string
 	outputResultPath string
 	outputStatePath  string
+	dumpJSON         bool
 )
 
 var getOutputCmd = &cobra.Command{
@@ -57,21 +58,51 @@ var getOutputCmd = &cobra.Command{
 		// Get Run Output (for Notebook results or logs)
 		// Note: GetRunOutput usually works for Notebook tasks.
 		// For Spark tasks, it might return driver logs if available.
-		output, err := w.Jobs.GetRunOutput(ctx, jobs.GetRunOutputRequest{RunId: getOutputRunID})
-		if err == nil {
+		output, outputErr := w.Jobs.GetRunOutput(ctx, jobs.GetRunOutputRequest{RunId: getOutputRunID})
+		
+		taskOutputs := make(map[string]*jobs.RunOutput)
+		var firstTaskOutput *jobs.RunOutput
+
+		// If root output failed or we want to be thorough, check sub-tasks
+		if len(run.Tasks) > 0 {
+			for _, task := range run.Tasks {
+				tOutput, err := w.Jobs.GetRunOutput(ctx, jobs.GetRunOutputRequest{RunId: task.RunId})
+				if err == nil {
+					taskOutputs[task.TaskKey] = tOutput
+					if firstTaskOutput == nil {
+						firstTaskOutput = tOutput
+					}
+				} else {
+					fmt.Printf("Warning: Could not fetch output for task %s (RunID: %d): %v\n", task.TaskKey, task.RunId, err)
+				}
+			}
+		}
+
+		// Decide which output to use for 'result' file and 'output' variable
+		// If root output is valid (and not just empty), use it. 
+		// Otherwise, fallback to first task output.
+		finalOutput := output
+		if outputErr != nil || (output != nil && output.NotebookOutput == nil && output.Logs == "" && output.Error == "") {
+			if firstTaskOutput != nil {
+				finalOutput = firstTaskOutput
+				outputErr = nil // Clear error as we found a fallback
+			}
+		}
+
+		if outputErr == nil && finalOutput != nil {
 			// If we successfully got output
 			if outputResultPath != "" {
 				// Notebook output usually has 'Logs' or 'NotebookOutput'
 				var content string
-				if output.NotebookOutput != nil {
+				if finalOutput.NotebookOutput != nil {
 					// result might be in specific field
-					if output.NotebookOutput.Result != "" {
-						content = output.NotebookOutput.Result
+					if finalOutput.NotebookOutput.Result != "" {
+						content = finalOutput.NotebookOutput.Result
 					}
-				} else if output.Logs != "" {
-					content = output.Logs
-				} else if output.Error != "" {
-					content = output.Error
+				} else if finalOutput.Logs != "" {
+					content = finalOutput.Logs
+				} else if finalOutput.Error != "" {
+					content = finalOutput.Error
 				}
 
 				if content != "" {
@@ -80,19 +111,61 @@ var getOutputCmd = &cobra.Command{
 					}
 				}
 			}
-			
-			if outputJSONPath != "" {
-				data, _ := json.MarshalIndent(output, "", "  ")
-				if err := os.WriteFile(outputJSONPath, data, 0644); err != nil {
-					return fmt.Errorf("failed to write output JSON: %w", err)
-				}
-			}
 		} else {
 			// It might not be a failure if the task type doesn't support GetRunOutput in the same way,
 			// or if logs aren't available yet. But usually for terminated runs it is.
-			fmt.Printf("Warning: Could not fetch run output: %v\n", err)
+			if !dumpJSON {
+				fmt.Printf("Warning: Could not fetch run output: %v\n", outputErr)
+			}
 		}
-		
+
+		// Always write JSON if requested, combining Run and Output (and Error if any)
+		if outputJSONPath != "" {
+			combined := struct {
+				Run         *jobs.Run                  `json:"run"`
+				Output      *jobs.RunOutput            `json:"output,omitempty"`
+				TaskOutputs map[string]*jobs.RunOutput `json:"task_outputs,omitempty"`
+				Error       string                     `json:"error,omitempty"`
+			}{
+				Run:         run,
+				Output:      finalOutput,
+				TaskOutputs: taskOutputs,
+			}
+			if outputErr != nil {
+				combined.Error = outputErr.Error()
+			}
+
+			data, err := json.MarshalIndent(combined, "", "  ")
+			if err != nil {
+				return fmt.Errorf("failed to marshal output JSON: %w", err)
+			}
+			if err := os.WriteFile(outputJSONPath, data, 0644); err != nil {
+				return fmt.Errorf("failed to write output JSON: %w", err)
+			}
+		}
+
+		if dumpJSON {
+			combined := struct {
+				Run         *jobs.Run                  `json:"run"`
+				Output      *jobs.RunOutput            `json:"output,omitempty"`
+				TaskOutputs map[string]*jobs.RunOutput `json:"task_outputs,omitempty"`
+				Error       string                     `json:"error,omitempty"`
+			}{
+				Run:         run,
+				Output:      finalOutput,
+				TaskOutputs: taskOutputs,
+			}
+			if outputErr != nil {
+				combined.Error = outputErr.Error()
+			}
+			data, err := json.MarshalIndent(combined, "", "  ")
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
+			return nil
+		}
+
 		// Print URL to stdout as well just in case
 		fmt.Printf("Run URL: %s\n", run.RunPageUrl)
 
@@ -103,9 +176,10 @@ var getOutputCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(getOutputCmd)
 	getOutputCmd.Flags().Int64Var(&getOutputRunID, "run-id", 0, "ID of the run")
-	getOutputCmd.Flags().StringVar(&outputJSONPath, "write-json", "", "Path to write full output JSON")
+	getOutputCmd.Flags().StringVar(&outputJSONPath, "write-json", "", "Path to write full output JSON file")
 	getOutputCmd.Flags().StringVar(&outputURLPath, "write-url", "", "Path to write Run Page URL")
 	getOutputCmd.Flags().StringVar(&outputResultPath, "write-result", "", "Path to write result value (e.g. notebook exit value)")
 	getOutputCmd.Flags().StringVar(&outputStatePath, "write-state", "", "Path to write run state")
+	getOutputCmd.Flags().BoolVar(&dumpJSON, "json", false, "Dump full JSON of run and output to stdout")
 	getOutputCmd.MarkFlagRequired("run-id")
 }

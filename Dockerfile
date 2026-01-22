@@ -18,10 +18,10 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o databricks-connector cmd/databricks-connector/main.go
 
 # Final stage
-FROM scratch
+FROM alpine:3.19
 
-# Copy CA certificates from builder to allow HTTPS requests to Databricks API
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+# Install ca-certificates (needed for HTTPS)
+RUN apk add --no-cache ca-certificates
 
 # Copy the binary
 COPY --from=builder /app/databricks-connector /databricks-connector

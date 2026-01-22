@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: databricks-notebook-run-
+spec:
+  entrypoint: main
+  activeDeadlineSeconds: 99999
+  arguments:
+    parameters:
+    # Update this path to where you uploaded the notebook
+    - name: notebook-path
+      value: "/Users/isitha@pipekit.io/hello_world" 
+
+  templates:
+  - name: main
+    steps:
+    - - name: run-notebook
+        templateRef:
+          name: databricks-connector
+          template: run-job
+        arguments:
+          parameters:
+          - name: cluster-mode
+            value: "Serverless"
+          - name: task-type
+            value: "notebook"
+          - name: code-path
+            value: "{{workflow.parameters.notebook-path}}"
+          - name: job-parameters
+            value: "name=ArgoUser"
+    
+    # Example of using the output
+    - - name: print-results
+        template: print-output
+        arguments:
+          parameters:
+          - name: run-id
+            value: "{{steps.run-notebook.outputs.parameters.run-id}}"
+          - name: result
+            value: "{{steps.run-notebook.outputs.parameters.result}}"
+          - name: url
+            value: "{{steps.run-notebook.outputs.parameters.run-url}}"
+
+  - name: print-output
+    inputs:
+      parameters:
+      - name: run-id
+      - name: result
+      - name: url
+    container:
+      image: alpine:latest
+      command: [sh, -c]
+      args: ["echo 'Job {{inputs.parameters.run-id}} finished!'; echo 'URL: {{inputs.parameters.url}}'; echo 'Result: {{inputs.parameters.result}}'"]

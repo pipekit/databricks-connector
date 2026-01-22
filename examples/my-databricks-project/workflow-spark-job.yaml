@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: databricks-spark-run-
+spec:
+  entrypoint: main
+  activeDeadlineSeconds: 99999
+  arguments:
+    parameters:
+    # Updated path to your uploaded script in the Workspace
+    - name: script-path
+      value: "/Users/isitha@pipekit.io/process_data.py" 
+
+  templates:
+  - name: main
+    steps:
+    - - name: run-script
+        templateRef:
+          name: databricks-connector
+          template: run-job
+        arguments:
+          parameters:
+          - name: cluster-mode
+            value: "Serverless"
+          - name: task-type
+            value: "spark-python"
+          - name: code-path
+            value: "{{workflow.parameters.script-path}}"
+          
+          # Pass args to the script
+          - name: job-parameters
+            value: "name=SparkMaster"

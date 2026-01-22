@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: databricks-run-existing-
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+    - name: job-id
+      value: "947573341607780"
+    - name: databricks-secret
+      value: "databricks-secret"
+
+  templates:
+  - name: main
+    dag:
+      tasks:
+      - name: start-job
+        templateRef:
+          name: databricks-connector
+          template: run-existing-job
+        arguments:
+          parameters:
+          - name: job-id
+            value: "{{workflow.parameters.job-id}}"
+          - name: databricks-secret-name
+            value: "{{workflow.parameters.databricks-secret}}"

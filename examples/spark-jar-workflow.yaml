@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: databricks-spark-jar-
+spec:
+  entrypoint: main
+  activeDeadlineSeconds: 99999
+  arguments:
+    parameters:
+    # NOTE: You must upload the built JAR to a location Databricks can access.
+    # Unity Catalog Volumes are recommended for Serverless.
+    - name: jar-path
+      value: "/Volumes/workspace/default/jars/spark-hello-world-1.0-SNAPSHOT.jar"
+    - name: main-class
+      value: "com.example.HelloWorld"
+    - name: databricks-secret
+      value: "databricks-secret"
+
+  templates:
+  - name: main
+    dag:
+      tasks:
+      - name: run-spark-jar
+        templateRef:
+          name: databricks-connector
+          template: run-job
+        arguments:
+          parameters:
+          - name: task-type
+            value: "spark-jar"
+          - name: code-path
+            value: "{{workflow.parameters.jar-path}}"
+          - name: main-class-name
+            value: "{{workflow.parameters.main-class}}"
+          - name: cluster-mode
+            value: "Serverless"
+          # - name: new-cluster-node-type
+          #   value: "i3.xlarge"
+          # - name: new-cluster-spark-version
+          #   value: "13.3.x-scala2.12"
+          # - name: scaling-type
+          #   value: "fixed"
+          # - name: new-cluster-num-workers
+          #   value: "1"
+          # - name: cloud-provider
+          #   value: "AWS"
+          # - name: availability
+          #   value: "SPOT"
+          - name: job-parameters
+            value: "arg1=test,arg2=example"
+          - name: databricks-secret-name
+            value: "{{workflow.parameters.databricks-secret}}"
