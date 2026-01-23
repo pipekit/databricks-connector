@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.12
 
 require (
-	github.com/databricks/databricks-sdk-go v0.96.0
+	github.com/databricks/databricks-sdk-go v0.100.0
 	github.com/spf13/cobra v1.10.2
 )
 
