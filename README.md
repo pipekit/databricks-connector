@@ -36,15 +36,25 @@ Submits a new run. Prints the Run ID to stdout.
   --parameters "arg1=val1"
 ```
 
-### 2. Monitor a Run
+### 2. Start an Existing Job
+
+Triggers a run of an existing Databricks job.
+
+```bash
+./databricks-connector start \
+  --job-id 123456 \
+  --job-params "key1=value1"
+```
+
+### 3. Monitor a Run
 
 Polls the run status and streams state changes. Blocks until completion.
 
 ```bash
-./databricks-connector monitor --run-id <RUN_ID>
+./databricks-connector monitor --run-id <RUN_ID> --interval 10s
 ```
 
-### 3. Get Outputs
+### 4. Get Outputs
 
 Retrieves run details and outputs to files (for Argo Output Parameters).
 
@@ -56,12 +66,94 @@ Retrieves run details and outputs to files (for Argo Output Parameters).
   --write-state /tmp/state.txt
 ```
 
-## Argo Integration Example
+### 5. Cancel a Run
 
-You can wrap this binary in a container and use it in a Workflow Template.
+Cancels an active run.
 
-1. **Submit Step:** Run `submit` and capture stdout as an output parameter `run-id`.
-2. **Monitor Step:** Run `monitor` using the `run-id` input.
-3. **Output Step:** Run `get-output` to write results to files, which Argo captures as output parameters.
-
+```bash
+./databricks-connector cancel --run-id <RUN_ID>
 ```
+
+## Kubernetes & Argo Setup
+
+To use this connector within Argo Workflows, you need to deploy the Workflow Template and a Secret containing your Databricks credentials.
+
+### 1. Configure Credentials
+
+Edit `manifests/secret-example.yaml` with your Databricks Host URL and Token.
+
+```bash
+kubectl apply -f manifests/secret-example.yaml
+```
+
+### 2. Install Workflow Template
+
+Apply the Workflow Template to your cluster. This template encapsulates the `submit` (or `start`), `monitor`, and `get-output` steps into a reusable `run-job` template.
+
+```bash
+kubectl apply -f manifests/workflow-template.yaml
+```
+
+### 3. Usage in a Workflow
+
+You can now reference the `databricks-connector` template in your own workflows.
+
+**Example: Submit a new Notebook run**
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: databricks-run-
+spec:
+  entrypoint: main
+  templates:
+  - name: main
+    steps:
+    - - name: run-notebook
+        templateRef:
+          name: databricks-connector
+          template: run-job
+        arguments:
+          parameters:
+          - name: code-path
+            value: "/Workspace/Users/me/my-notebook"
+          - name: task-type
+            value: "notebook"
+          - name: cluster-mode
+            value: "Existing"
+          - name: existing-cluster-id
+            value: "1234-567890-abcde"
+```
+
+**Example: Run an existing Job**
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: databricks-job-run-
+spec:
+  entrypoint: main
+  templates:
+  - name: main
+    steps:
+    - - name: run-job
+        templateRef:
+          name: databricks-connector
+          template: run-existing-job
+        arguments:
+          parameters:
+          - name: job-id
+            value: "987654"
+```
+
+## Examples
+
+Check the `examples/` directory for ready-to-use Workflow manifests:
+
+*   **`examples/spark-jar-workflow.yaml`**: Demonstrates running a Spark JAR task (includes a sample Java project).
+*   **`examples/run-existing-job-workflow.yaml`**: Demonstrates triggering an existing Databricks Job by ID.
+*   **`examples/my-databricks-project/`**: Contains sample Python scripts and notebooks for testing.
+
+See `examples/README.md` for detailed build and usage instructions.
