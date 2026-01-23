@@ -196,6 +196,18 @@ spec:
       - name: job-parameters
         value: ""
         description: "Comma-separated parameters (e.g., key1=value1,key2=value2)"
+      - name: notebook-params
+        value: ""
+        description: "Notebook parameters (key=value)"
+      - name: python-params
+        value: ""
+        description: "Python parameters (positional)"
+      - name: jar-params
+        value: ""
+        description: "JAR parameters (positional)"
+      - name: spark-submit-params
+        value: ""
+        description: "Spark submit parameters (positional)"
       
       # Auth
       - name: databricks-secret-name
@@ -229,6 +241,14 @@ spec:
             value: "{{inputs.parameters.job-id}}"
           - name: job-parameters
             value: "{{inputs.parameters.job-parameters}}"
+          - name: notebook-params
+            value: "{{inputs.parameters.notebook-params}}"
+          - name: python-params
+            value: "{{inputs.parameters.python-params}}"
+          - name: jar-params
+            value: "{{inputs.parameters.jar-params}}"
+          - name: spark-submit-params
+            value: "{{inputs.parameters.spark-submit-params}}"
           - name: databricks-secret-name
             value: "{{inputs.parameters.databricks-secret-name}}"
 
@@ -278,7 +298,7 @@ spec:
       - name: email-notifications
       - name: databricks-secret-name
     container:
-      image: ghcr.io/pipekit/databricks-connector:v0.0.1
+      image: ghcr.io/pipekit/databricks-connector:v0.0.2
       command: ["/databricks-connector", "submit"]
       args:
       - "--code-path={{inputs.parameters.code-path}}"
@@ -326,13 +346,25 @@ spec:
       parameters:
       - name: job-id
       - name: job-parameters
+      - name: notebook-params
+        value: ""
+      - name: python-params
+        value: ""
+      - name: jar-params
+        value: ""
+      - name: spark-submit-params
+        value: ""
       - name: databricks-secret-name
     container:
-      image: ghcr.io/pipekit/databricks-connector:v0.0.1
+      image: ghcr.io/pipekit/databricks-connector:v0.0.2
       command: ["/databricks-connector", "start"]
       args:
       - "--job-id={{inputs.parameters.job-id}}"
       - "--job-params={{inputs.parameters.job-parameters}}"
+      - "--notebook-params={{inputs.parameters.notebook-params}}"
+      - "--python-params={{inputs.parameters.python-params}}"
+      - "--jar-params={{inputs.parameters.jar-params}}"
+      - "--spark-submit-params={{inputs.parameters.spark-submit-params}}"
       env:
       - name: DATABRICKS_HOST
         valueFrom:
@@ -357,11 +389,14 @@ spec:
       parameters:
       - name: run-id
       - name: databricks-secret-name
+      - name: poll-interval
+        value: "10s"
     container:
-      image: ghcr.io/pipekit/databricks-connector:v0.0.1
+      image: ghcr.io/pipekit/databricks-connector:v0.0.2
       command: ["/databricks-connector", "monitor"]
       args:
       - "--run-id={{inputs.parameters.run-id}}"
+      - "--interval={{inputs.parameters.poll-interval}}"
       env:
       - name: DATABRICKS_HOST
         valueFrom:
@@ -399,7 +434,7 @@ spec:
         valueFrom:
           path: /tmp/json
     container:
-      image: ghcr.io/pipekit/databricks-connector:v0.0.1
+      image: ghcr.io/pipekit/databricks-connector:v0.0.2
       command: ["/databricks-connector", "get-output"]
       args:
       - "--run-id={{inputs.parameters.run-id}}"
@@ -429,7 +464,7 @@ spec:
       - name: run-id
       - name: databricks-secret-name
     container:
-      image: ghcr.io/pipekit/databricks-connector:v0.0.1
+      image: ghcr.io/pipekit/databricks-connector:v0.0.2
       command: ["/databricks-connector", "cancel"]
       args:
       - "--run-id={{inputs.parameters.run-id}}"
