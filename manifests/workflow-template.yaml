@@ -278,7 +278,7 @@ spec:
       - name: email-notifications
       - name: databricks-secret-name
     container:
-      image: isubasinghe/databricks-connector:latest
+      image: ghcr.io/pipekit/databricks-connector:v0.0.1
       command: ["/databricks-connector", "submit"]
       args:
       - "--code-path={{inputs.parameters.code-path}}"
@@ -328,7 +328,7 @@ spec:
       - name: job-parameters
       - name: databricks-secret-name
     container:
-      image: isubasinghe/databricks-connector:latest
+      image: ghcr.io/pipekit/databricks-connector:v0.0.1
       command: ["/databricks-connector", "start"]
       args:
       - "--job-id={{inputs.parameters.job-id}}"
@@ -358,7 +358,7 @@ spec:
       - name: run-id
       - name: databricks-secret-name
     container:
-      image: isubasinghe/databricks-connector:latest
+      image: ghcr.io/pipekit/databricks-connector:v0.0.1
       command: ["/databricks-connector", "monitor"]
       args:
       - "--run-id={{inputs.parameters.run-id}}"
@@ -399,7 +399,7 @@ spec:
         valueFrom:
           path: /tmp/json
     container:
-      image: isubasinghe/databricks-connector:latest
+      image: ghcr.io/pipekit/databricks-connector:v0.0.1
       command: ["/databricks-connector", "get-output"]
       args:
       - "--run-id={{inputs.parameters.run-id}}"
@@ -429,7 +429,7 @@ spec:
       - name: run-id
       - name: databricks-secret-name
     container:
-      image: isubasinghe/databricks-connector:latest
+      image: ghcr.io/pipekit/databricks-connector:v0.0.1
       command: ["/databricks-connector", "cancel"]
       args:
       - "--run-id={{inputs.parameters.run-id}}"
