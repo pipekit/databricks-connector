@@ -1,0 +1,39 @@
+name: Renovate gomod2nix
+
+on:
+  pull_request:
+    paths:
+      - 'go.mod'
+      - 'go.sum'
+
+permissions:
+  contents: write
+
+jobs:
+  gomod2nix:
+    if: github.actor == 'renovate[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Run gomod2nix (via Docker)
+        run: make gomod2nix
+
+      - name: Check for changes
+        id: check
+        run: |
+          if [[ -n $(git status --porcelain gomod2nix.toml) ]]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and Push
+        if: steps.check.outputs.changes == 'true'
+        run: |
+          git config --global user.name "renovate[bot]"
+          git config --global user.email "renovate[bot]@users.noreply.github.com"
+          git add gomod2nix.toml
+          git commit -m "chore(nix): update gomod2nix.toml"
+          git push
