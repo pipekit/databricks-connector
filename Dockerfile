@@ -18,7 +18,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o databricks-connector cmd/databricks-connector/main.go
 
 # Final stage
-FROM alpine:3.21
+FROM alpine:3.24
 
 # Upgrade packages to fix vulnerabilities (e.g. busybox) and install ca-certificates
 RUN apk upgrade --no-cache && apk add --no-cache ca-certificates
